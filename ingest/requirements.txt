@@ -1,0 +1,7 @@
+# Ingest-only deps (added on top of the marketing-cli package itself).
+# Install: pip install -r ingest/requirements.txt
+psycopg[binary]>=3.2
+python-dotenv>=1.0
+simple-salesforce>=1.12
+PyJWT>=2.8
+cryptography>=42.0

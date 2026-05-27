@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "marketing-cli"
+version = "0.2.0"
+description = "Personal terminal CLIs for pulling Google Ads, GA4, and Search Console data and applying reviewed changes"
+requires-python = ">=3.9"
+dependencies = [
+    "google-ads>=25.0.0",
+    "click>=8.1.0",
+    "pyyaml>=6.0",
+    "rich>=13.7.0",
+    "google-analytics-data>=0.18.0",
+    "google-api-python-client>=2.0",
+    "google-auth-oauthlib>=1.0",
+    "requests>=2.20",
+    "facebook-business>=20.0",
+]
+
+[project.scripts]
+gads = "gads.cli:cli"
+ga4 = "ga4.cli:cli"
+sc = "search_console.cli:cli"
+gtm = "gtm.cli:cli"
+cegg = "crazyegg.cli:cli"
+fb = "fb.cli:cli"
+gbp = "gbp.cli:cli"
+psi = "psi.cli:cli"
+yt = "yt.cli:cli"
+maps = "maps.cli:cli"
+cse = "cse.cli:cli"
+lsa = "lsa.cli:cli"
+callrail = "callrail.cli:cli"
+postalytics = "postalytics.cli:cli"
+
+[tool.setuptools.packages.find]
+include = ["gads*", "ga4*", "search_console*", "gtm*", "crazyegg*", "fb*", "gbp*", "psi*", "yt*", "maps*", "cse*", "lsa*", "callrail*", "postalytics*"]

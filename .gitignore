@@ -1,0 +1,35 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+
+# Credentials — never commit these
+*.yaml
+!*.yaml.example
+!google-ads.yaml.example
+.env
+.env.*
+*.local.yaml
+*.secrets
+
+# Runtime data
+audit.log
+*.log
+
+# OS / IDE
+.DS_Store
+.vscode/
+.idea/
+
+# Local data dumps
+audits/_data/
+proposals/
+out/
+tmp/
+
+# Build artifacts
+.vercel/

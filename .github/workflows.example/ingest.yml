@@ -1,0 +1,125 @@
+name: ingest
+
+on:
+  schedule:
+    # Hourly for paid (gads/fb), every hour on the :05
+    - cron: "5 * * * *"
+    # Nightly @ 04:00 ET (= 09:00 UTC) for the full set
+    - cron: "0 9 * * *"
+  workflow_dispatch:                # manual trigger from GitHub UI
+  repository_dispatch:              # programmatic trigger from /api/refresh
+    types: [refresh-platform]
+
+permissions:
+  contents: read
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Cadence is enforced inside the step via if: conditions on github.event
+          - { platform: gads,     module: ingest.ingest_gads,     cadence: hourly }
+          - { platform: fb,       module: ingest.ingest_fb,       cadence: hourly }
+          - { platform: callrail, module: ingest.ingest_callrail, cadence: hourly }
+          - { platform: ga4,      module: ingest.ingest_ga4,      cadence: nightly }
+          - { platform: gbp,      module: ingest.ingest_gbp,      cadence: nightly }
+          - { platform: sc,       module: ingest.ingest_sc,       cadence: nightly }
+          - { platform: maps,     module: ingest.ingest_maps,     cadence: nightly }
+          - { platform: cse,      module: ingest.ingest_cse,      cadence: nightly }
+          - { platform: psi,      module: ingest.ingest_psi,      cadence: nightly }
+          - { platform: yt,       module: ingest.ingest_yt,       cadence: nightly }
+          - { platform: qb,       module: ingest.ingest_qb,       cadence: nightly }
+          - { platform: plaid,    module: ingest.ingest_plaid,    cadence: hourly }
+          - { platform: sf,       module: ingest.ingest_sf,       cadence: nightly }
+          - { platform: calendly, module: ingest.ingest_calendly, cadence: nightly }
+          - { platform: callingly,module: ingest.ingest_callingly,cadence: hourly }
+    steps:
+      - name: Skip if cadence doesn't match this trigger
+        id: gate
+        run: |
+          run_it=false
+          case "${{ github.event_name }}" in
+            workflow_dispatch|repository_dispatch) run_it=true ;;
+            schedule)
+              if [[ "${{ matrix.cadence }}" == "hourly" ]]; then
+                run_it=true
+              elif [[ "${{ matrix.cadence }}" == "nightly" && "${{ github.event.schedule }}" == "0 9 * * *" ]]; then
+                run_it=true
+              fi
+              ;;
+          esac
+          # repository_dispatch with specific platforms in client_payload
+          if [[ "${{ github.event_name }}" == "repository_dispatch" ]]; then
+            wanted='${{ toJSON(github.event.client_payload.platforms) }}'
+            if ! echo "$wanted" | grep -q '"${{ matrix.platform }}"'; then
+              run_it=false
+            fi
+          fi
+          echo "run_it=$run_it" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        if: steps.gate.outputs.run_it == 'true'
+
+      - uses: actions/setup-python@v5
+        if: steps.gate.outputs.run_it == 'true'
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install
+        if: steps.gate.outputs.run_it == 'true'
+        run: |
+          pip install -e .
+          pip install -r ingest/requirements.txt
+
+      - name: Write google-ads.yaml from secret
+        if: steps.gate.outputs.run_it == 'true'
+        env:
+          GOOGLE_ADS_YAML: ${{ secrets.GOOGLE_ADS_YAML }}
+        run: |
+          printf '%s' "$GOOGLE_ADS_YAML" > google-ads.yaml
+          chmod 600 google-ads.yaml
+
+      - name: Run ${{ matrix.platform }} ingester
+        if: steps.gate.outputs.run_it == 'true'
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SLACK_ALERT_WEBHOOK_URL: ${{ secrets.SLACK_ALERT_WEBHOOK_URL }}
+          # SF JWT bearer
+          SF_INSTANCE_URL: ${{ secrets.SF_INSTANCE_URL }}
+          SF_CLIENT_ID:    ${{ secrets.SF_CLIENT_ID }}
+          SF_USERNAME:     ${{ secrets.SF_USERNAME }}
+          SF_PRIVATE_KEY:  ${{ secrets.SF_PRIVATE_KEY }}
+        run: python -m ${{ matrix.module }}
+
+      - name: Match TV airings to leads (after sf ingest only)
+        if: steps.gate.outputs.run_it == 'true' && matrix.platform == 'sf'
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SF_INSTANCE_URL: ${{ secrets.SF_INSTANCE_URL }}
+          SF_CLIENT_ID:    ${{ secrets.SF_CLIENT_ID }}
+          SF_USERNAME:     ${{ secrets.SF_USERNAME }}
+          SF_PRIVATE_KEY:  ${{ secrets.SF_PRIVATE_KEY }}
+        run: python -m ingest.match_tv_leads
+
+  alerts:
+    runs-on: ubuntu-latest
+    needs: ingest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11", cache: pip }
+      - name: Install
+        run: |
+          pip install -e .
+          pip install -r ingest/requirements.txt
+      - name: Evaluate alert rules → Slack
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SLACK_ALERT_WEBHOOK_URL: ${{ secrets.SLACK_ALERT_WEBHOOK_URL }}
+          DASHBOARD_BASE_URL: ${{ secrets.DASHBOARD_BASE_URL }}
+        run: python -m ingest.alerts

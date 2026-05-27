@@ -1,0 +1,39 @@
+developer_token: "YOUR_DEVELOPER_TOKEN"
+client_id: "YOUR_OAUTH_CLIENT_ID.apps.googleusercontent.com"
+client_secret: "YOUR_OAUTH_CLIENT_SECRET"
+refresh_token: "FILLED_BY_gads_auth_init"
+# MCC (manager) account ID — required since developer tokens are MCC-only.
+# Leave null only if customer_id IS the MCC.
+login_customer_id: "1112223333"
+# The account whose data you want to pull / mutate.
+customer_id: "1234567890"
+use_proto_plus: true
+
+# GA4 Data API — Property ID (numeric, ~9 digits).
+# GA4 → Admin → Property Settings → Property ID.
+ga4_property_id: "123456789"
+
+# Search Console — verified property string.
+# Domain property:   "sc-domain:YOUR_DOMAIN"
+# URL prefix property: "https://www.dustinbuyshouses.net/"
+search_console_site_url: "sc-domain:example.com"
+
+# Google Tag Manager — numeric account + container IDs.
+# `gtm accounts` and `gtm containers` will list yours after re-auth.
+gtm_account_id: "1234567"
+gtm_container_id: "12345678"
+
+# Crazy Egg — API key + secret from Site Settings → API Keys.
+# Used for HMAC signing on every non-status request.
+crazyegg_api_key: "PUT_KEY_HERE"
+crazyegg_api_secret: "PUT_SECRET_HERE"
+
+# Meta (Facebook) Marketing API — System User access token + app credentials.
+# See FACEBOOK_HANDOFF.md Phase 0 for how to gather these.
+fb_access_token: "EAA..."                # System User long-lived token
+fb_app_id: "1234567890"                  # From developers.facebook.com app
+fb_app_secret: "abc123..."               # From the app's Settings → Basic
+fb_business_id: "1234567890"             # Business Manager ID
+fb_ad_account_id: "act_1234567890"       # Ad account (KEEP the act_ prefix)
+fb_pixel_id: "1234567890123456"          # From Business Manager → Data Sources
+fb_api_version: "v23.0"                  # Pin explicitly; update intentionally

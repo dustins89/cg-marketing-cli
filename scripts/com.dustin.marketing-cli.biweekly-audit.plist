@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.dustin.marketing-cli.biweekly-audit</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/zsh</string>
+        <string>-c</string>
+        <string>cd /Users/dustinsinger/marketing-cli &amp;&amp; source .venv/bin/activate &amp;&amp; python3 scripts/biweekly_audit.py --email &gt;&gt; /Users/dustinsinger/marketing-cli/audits/_data/launchd.log 2&gt;&amp;1</string>
+    </array>
+
+    <!--
+      Run every other Sunday at 06:00.
+      launchd doesn't natively support biweekly, so we run every Sunday but
+      the script self-throttles to bi-weekly by checking the last audit date.
+      (See top of biweekly_audit.py for the date check we'd add.)
+
+      For now this fires WEEKLY. To make it true bi-weekly, you can:
+        (a) flip to monthly: change Weekday=0 to Day=1,15 to run on the 1st + 15th
+        (b) keep weekly: weekly drift detection is arguably better than bi-weekly
+        (c) add a date-check to biweekly_audit.py to skip alternate weeks
+    -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Weekday</key>
+        <integer>0</integer>
+        <key>Hour</key>
+        <integer>6</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/dustinsinger/marketing-cli/audits/_data/launchd.stdout.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/dustinsinger/marketing-cli/audits/_data/launchd.stderr.log</string>
+
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>

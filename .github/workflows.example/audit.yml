@@ -1,0 +1,114 @@
+name: audit
+
+on:
+  schedule:
+    # Bi-weekly master audit: Monday 10:00 UTC (5am ET) on the 1st and 15th
+    - cron: "0 10 1,15 * *"
+    # Weekly Gads deep audit (highest-leverage platform): every Monday 11:00 UTC
+    - cron: "0 11 * * 1"
+    # Weekly Search Console: every Tuesday 11:00 UTC
+    - cron: "0 11 * * 2"
+    # Weekly Facebook creative: every Wednesday 11:00 UTC
+    - cron: "0 11 * * 3"
+    # Weekly Maps competitors: every Thursday 11:00 UTC
+    - cron: "0 11 * * 4"
+    # Weekly PSI: every Friday 11:00 UTC
+    - cron: "0 11 * * 5"
+  workflow_dispatch:
+    inputs:
+      audit_type:
+        description: "Which audit to run"
+        required: true
+        type: choice
+        default: biweekly
+        options:
+          - biweekly
+          - gads
+          - sc
+          - fb_creative
+          - maps
+          - psi
+          - ga4
+          - yt
+          - forms
+  repository_dispatch:
+    types: [run-audit]
+
+permissions:
+  contents: write   # so we can commit audit results back to the repo
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Decide audit type
+        id: pick
+        run: |
+          # Cron schedules → audit type mapping
+          case "${{ github.event.schedule }}" in
+            "0 10 1,15 * *") echo "audit_type=biweekly"    >> $GITHUB_OUTPUT ;;
+            "0 11 * * 1")    echo "audit_type=gads"        >> $GITHUB_OUTPUT ;;
+            "0 11 * * 2")    echo "audit_type=sc"          >> $GITHUB_OUTPUT ;;
+            "0 11 * * 3")    echo "audit_type=fb_creative" >> $GITHUB_OUTPUT ;;
+            "0 11 * * 4")    echo "audit_type=maps"        >> $GITHUB_OUTPUT ;;
+            "0 11 * * 5")    echo "audit_type=psi"         >> $GITHUB_OUTPUT ;;
+          esac
+          # Manual dispatch overrides
+          if [[ -n "${{ inputs.audit_type }}" ]]; then
+            echo "audit_type=${{ inputs.audit_type }}" >> $GITHUB_OUTPUT
+          fi
+          # repository_dispatch payload override
+          if [[ "${{ github.event_name }}" == "repository_dispatch" ]]; then
+            echo "audit_type=${{ github.event.client_payload.audit_type }}" >> $GITHUB_OUTPUT
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11", cache: pip }
+      - name: Install
+        run: |
+          pip install -e .
+          pip install -r ingest/requirements.txt
+          pip install pyyaml
+
+      - name: Write google-ads.yaml from secret
+        env:
+          GOOGLE_ADS_YAML: ${{ secrets.GOOGLE_ADS_YAML }}
+        run: |
+          printf '%s' "$GOOGLE_ADS_YAML" > google-ads.yaml
+          chmod 600 google-ads.yaml
+
+      - name: Run audit
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -e
+          mkdir -p audits
+          case "${{ steps.pick.outputs.audit_type }}" in
+            biweekly)    python -m scripts.biweekly_audit --email ;;
+            gads)        python scripts/deep_audit_gads_v2.py     | tee "audits/$(date +%F)_gads.md" ;;
+            sc)          python scripts/deep_audit_sc.py          | tee "audits/$(date +%F)_sc.md" ;;
+            fb_creative) python scripts/deep_audit_fb_creative.py | tee "audits/$(date +%F)_fb_creative.md" ;;
+            maps)        python scripts/deep_audit_maps.py        | tee "audits/$(date +%F)_maps.md" ;;
+            psi)         python scripts/deep_audit_psi.py         | tee "audits/$(date +%F)_psi.md" ;;
+            ga4)         python scripts/deep_audit_ga4.py         | tee "audits/$(date +%F)_ga4.md" ;;
+            yt)          python scripts/deep_audit_yt.py          | tee "audits/$(date +%F)_yt.md" ;;
+            forms)       python scripts/deep_audit_forms.py       | tee "audits/$(date +%F)_forms.md" ;;
+            *) echo "Unknown audit type"; exit 1 ;;
+          esac
+
+      - name: Commit results back to repo
+        run: |
+          # Pull any concurrent updates first (parallel workflows can race)
+          git config user.email "dustins89@users.noreply.github.com"
+          git config user.name  "dustins89"
+          git pull --rebase origin main || true
+          git add audits/
+          if ! git diff --cached --quiet; then
+            git commit -m "Audit run: ${{ steps.pick.outputs.audit_type }} ($(date +%F))"
+            git push origin HEAD:main
+          else
+            echo "No audit changes to commit."
+          fi
