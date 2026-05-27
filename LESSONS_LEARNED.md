@@ -1,6 +1,6 @@
 # Lessons Learned — patterns and gotchas from real Claude-Salesforce work
 
-These are the rules that emerged over 6+ months of building Salesforce + marketing automation with Claude Code. Each one is here because skipping it cost time. Generalized so they apply to any org, not just the one this repo came from.
+These are the rules that emerged from building Salesforce + marketing automation with Claude Code. Each one is here because skipping it cost time. Generalized so they apply to any org, not just the one this repo came from.
 
 ---
 
